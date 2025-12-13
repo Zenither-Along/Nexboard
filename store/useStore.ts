@@ -13,19 +13,25 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react';
 
+export type Tool = 'select' | 'hand' | 'frame' | 'rectangle' | 'text' | 'polaroid' | 'sticky' | 'comment';
+
 type State = {
   nodes: Node[];
   edges: Edge[];
+  activeTool: Tool;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
+  setActiveTool: (tool: Tool) => void;
+  addNode: (node: Node) => void;
 };
 
 const useStore = create<State>((set, get) => ({
   nodes: [],
   edges: [],
+  activeTool: 'select',
   onNodesChange: (changes: NodeChange[]) => {
     set({
       nodes: applyNodeChanges(changes, get().nodes),
@@ -46,6 +52,12 @@ const useStore = create<State>((set, get) => ({
   },
   setEdges: (edges: Edge[]) => {
     set({ edges });
+  },
+  setActiveTool: (tool: Tool) => {
+    set({ activeTool: tool });
+  },
+  addNode: (node: Node) => {
+    set({ nodes: [...get().nodes, node] });
   },
 }));
 

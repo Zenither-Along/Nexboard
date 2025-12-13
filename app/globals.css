@@ -70,3 +70,8 @@
     display: none; /* Chrome, Safari, Opera */
   }
 }
+
+/* Smooth React Flow viewport transitions */
+.react-flow__viewport {
+  transition: transform 0.15s ease-out;
+}
