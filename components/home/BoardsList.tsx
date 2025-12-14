@@ -5,6 +5,7 @@ import { Plus, MoreHorizontal, Folder, Clock, ChevronRight, Pencil, Trash2, Smil
 import { useTheme } from 'next-themes';
 import { useBoardStore, Board } from '@/store/useBoardStore';
 import { EmojiPickerPopup } from '@/components/ui/EmojiPickerPopup';
+import { toast } from '@/lib/toast';
 
 export function BoardsList() {
     const { resolvedTheme } = useTheme();
@@ -71,9 +72,18 @@ export function BoardsList() {
         setIconPickerBoard(null);
     };
 
-    const handleDeleteBoard = (boardId: string) => {
-        if (confirm('Delete this board and all its columns and tasks?')) {
+    const handleDeleteBoard = async (boardId: string) => {
+        const confirmed = await toast.confirm({
+            title: 'Delete Board',
+            message: 'Delete this board and all its columns and tasks? This action cannot be undone.',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            variant: 'danger',
+        });
+        
+        if (confirmed) {
             deleteBoard(boardId);
+            toast.success('Board deleted successfully');
         }
         setOpenBoardMenu(null);
     };

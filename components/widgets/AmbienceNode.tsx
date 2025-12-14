@@ -1,10 +1,18 @@
 "use client"
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { Volume2, VolumeX, Cloud, Coffee, Waves } from 'lucide-react';
+import { audioManager } from '@/lib/audioManager';
 
 type SoundType = 'rain' | 'cafe' | 'ocean';
+
+// Sound URLs for the ambience node
+const NODE_SOUNDS = [
+  { id: 'rain', url: 'https://cdn.pixabay.com/audio/2022/05/13/audio_257112ce99.mp3' },
+  { id: 'cafe', url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_c610232c18.mp3' },
+  { id: 'ocean', url: 'https://cdn.pixabay.com/audio/2022/06/07/audio_b9bd4170e4.mp3' },
+];
 
 export default function AmbienceNode({ data }: { data: any }) {
   const [volumes, setVolumes] = useState<Record<SoundType, number>>({
@@ -12,6 +20,18 @@ export default function AmbienceNode({ data }: { data: any }) {
     cafe: 0,
     ocean: 0,
   });
+
+  // Initialize audio manager
+  useEffect(() => {
+    audioManager.initialize(NODE_SOUNDS);
+  }, []);
+
+  // Update audio when volumes change
+  useEffect(() => {
+    (Object.keys(volumes) as SoundType[]).forEach((sound) => {
+      audioManager.updateAudio(sound, volumes[sound], false);
+    });
+  }, [volumes]);
 
   const updateVolume = (sound: SoundType, value: number) => {
     setVolumes(prev => ({ ...prev, [sound]: value }));

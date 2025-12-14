@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CloudRain, Waves, TreePine, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { audioManager } from '@/lib/audioManager';
 
 // Sound configuration - 3 reliable sounds
 const SOUNDS = [
@@ -32,63 +33,47 @@ const SOUNDS = [
 export function AmbienceWidget() {
     const { resolvedTheme } = useTheme();
     const isDark = resolvedTheme === 'dark';
+    const hasSyncedRef = useRef(false);
     
-    const [volumes, setVolumes] = useState<Record<string, number>>({
-        rain: 0,
-        ocean: 0,
-        forest: 0,
-    });
-    
-    const [muted, setMuted] = useState<Record<string, boolean>>({
-        rain: false,
-        ocean: false,
-        forest: false,
-    });
-    
-    const audiosRef = useRef<Record<string, HTMLAudioElement | null>>({});
-    
-    // Create audio elements once
-    useEffect(() => {
+    // Lazy state initialization - restore from audioManager on first render
+    const [volumes, setVolumes] = useState<Record<string, number>>(() => {
+        const savedStates = audioManager.getAllStates();
+        const restoredVolumes: Record<string, number> = {};
+        
         SOUNDS.forEach(sound => {
-            const audio = new Audio(sound.url);
-            audio.loop = true;
-            audio.volume = 0;
-            audiosRef.current[sound.id] = audio;
+            const state = savedStates[sound.id];
+            restoredVolumes[sound.id] = state?.volume ?? 0;
         });
         
-        return () => {
-            Object.values(audiosRef.current).forEach(audio => {
-                if (audio) {
-                    audio.pause();
-                    audio.src = '';
-                }
-            });
-        };
-    }, []);
+        return restoredVolumes;
+    });
     
-    // Handle volume and playback
-    const updateAudio = useCallback((id: string, volume: number, isMuted: boolean) => {
-        const audio = audiosRef.current[id];
-        if (!audio) return;
+    const [muted, setMuted] = useState<Record<string, boolean>>(() => {
+        const savedStates = audioManager.getAllStates();
+        const restoredMuted: Record<string, boolean> = {};
         
-        const effectiveVolume = isMuted ? 0 : volume / 100;
-        audio.volume = effectiveVolume;
-        
-        if (volume > 0 && !isMuted) {
-            if (audio.paused) {
-                audio.play().catch(() => {});
-            }
-        } else {
-            audio.pause();
-        }
-    }, []);
-    
-    // Update audio when state changes
-    useEffect(() => {
         SOUNDS.forEach(sound => {
-            updateAudio(sound.id, volumes[sound.id], muted[sound.id]);
+            const state = savedStates[sound.id];
+            restoredMuted[sound.id] = state?.muted ?? false;
         });
-    }, [volumes, muted, updateAudio]);
+        
+        return restoredMuted;
+    });
+    
+    // Initialize audio manager once
+    useEffect(() => {
+        audioManager.initialize(SOUNDS);
+        hasSyncedRef.current = true;
+    }, []);
+    
+    // Update audio when state changes (but only after initial sync)
+    useEffect(() => {
+        if (!hasSyncedRef.current) return;
+        
+        SOUNDS.forEach(sound => {
+            audioManager.updateAudio(sound.id, volumes[sound.id], muted[sound.id]);
+        });
+    }, [volumes, muted]);
     
     const handleVolumeChange = (id: string, value: number) => {
         setVolumes(prev => ({ ...prev, [id]: value }));
@@ -99,6 +84,7 @@ export function AmbienceWidget() {
     };
     
     const stopAll = () => {
+        audioManager.stopAll();
         setVolumes({ rain: 0, ocean: 0, forest: 0 });
         setMuted({ rain: false, ocean: false, forest: false });
     };
