@@ -110,10 +110,11 @@ function Toast({ toast, isDark }: { toast: ToastType; isDark: boolean }) {
       </p>
       <button
         onClick={() => toastManager.removeToast(toast.id)}
+        className="touch-target"
         style={{
-          width: 28,
-          height: 28,
-          borderRadius: 6,
+          width: 32,
+          height: 32,
+          borderRadius: 8,
           border: 'none',
           backgroundColor: 'transparent',
           color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)',
@@ -133,7 +134,7 @@ function Toast({ toast, isDark }: { toast: ToastType; isDark: boolean }) {
           e.currentTarget.style.backgroundColor = 'transparent';
         }}
       >
-        <X size={16} />
+        <X size={18} />
       </button>
     </motion.div>
   );

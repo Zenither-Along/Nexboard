@@ -1,8 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Instrument_Sans } from "next/font/google";
 import "./globals.css";
+import "./touch.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/providers/ToastProvider";
+import { MobileDetector } from "@/components/providers/MobileDetector";
 
 const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
@@ -10,9 +12,18 @@ const instrumentSans = Instrument_Sans({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: 'cover',
+};
+
 export const metadata: Metadata = {
-  title: "Flow Canvas",
-  description: "A premium productivity workspace.",
+  title: "Nexboard - Desktop Productivity Workspace",
+  description: "A premium productivity workspace optimized for desktop browsers.",
 };
 
 export default function RootLayout({
@@ -30,7 +41,9 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <ToastProvider>
-              {children}
+              <MobileDetector>
+                {children}
+              </MobileDetector>
             </ToastProvider>
           </ThemeProvider>
       </body>

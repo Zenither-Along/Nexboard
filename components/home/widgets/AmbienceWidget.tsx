@@ -124,10 +124,11 @@ export function AmbienceWidget() {
                                 <span style={{ fontSize: 10, color: textMuted }}>{volume}%</span>
                                 <button
                                     onClick={() => toggleMute(id)}
+                                    className="touch-target"
                                     style={{
-                                        width: 22,
-                                        height: 22,
-                                        borderRadius: 4,
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: 6,
                                         border: 'none',
                                         backgroundColor: isMuted ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') : 'transparent',
                                         color: isMuted ? '#ef4444' : textMuted,
@@ -138,7 +139,7 @@ export function AmbienceWidget() {
                                     }}
                                     title={isMuted ? 'Unmute' : 'Mute'}
                                 >
-                                    {isMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                                    {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
                                 </button>
                             </div>
                         </div>
@@ -148,10 +149,11 @@ export function AmbienceWidget() {
                             max="100"
                             value={volume}
                             onChange={(e) => handleVolumeChange(id, Number(e.target.value))}
+                            className="touch-action-pan"
                             style={{
                                 width: '100%',
-                                height: 4,
-                                borderRadius: 2,
+                                height: 6,
+                                borderRadius: 3,
                                 appearance: 'none',
                                 backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
                                 cursor: 'pointer',

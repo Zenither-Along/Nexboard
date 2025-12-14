@@ -1,0 +1,90 @@
+/**
+ * Touch-friendly CSS utilities
+ * Add these classes to elements that need better touch interaction
+ */
+
+/* Minimum touch target size (44x44px recommended by Apple/Google) */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Prevent touch callout and selection on touch devices */
+.touch-action-none {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Allow only pan gestures */
+.touch-action-pan {
+  touch-action: pan-x pan-y;
+}
+
+/* Larger tap area for small elements */
+.touch-tap-area {
+  position: relative;
+}
+
+.touch-tap-area::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+}
+
+/* Smooth touch scrolling */
+.touch-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Prevent text selection during touch interactions */
+.no-touch-select {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Active state for touch */
+.touch-active:active {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+
+/* Canvas-specific touch optimizations */
+.react-flow__pane {
+  touch-action: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+.react-flow__node {
+  touch-action: none !important;
+}
+
+/* Make nodes easier to select on touch */
+.react-flow__node:active {
+  cursor: grabbing !important;
+}
+
+/* Larger selection handles for touch */
+@media (hover: none) and (pointer: coarse) {
+  .react-flow__handle {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  
+  .react-flow__resize-control {
+    width: 20px !important;
+    height: 20px !important;
+  }
+}
+

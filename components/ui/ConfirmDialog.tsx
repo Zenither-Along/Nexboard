@@ -137,14 +137,16 @@ export function ConfirmDialog() {
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                 <button
                   onClick={handleCancel}
+                  className="touch-target"
                   style={{
-                    padding: '10px 20px',
-                    borderRadius: 8,
+                    padding: '12px 24px',
+                    minHeight: 48,
+                    borderRadius: 10,
                     border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.12)'}`,
                     backgroundColor: 'transparent',
                     color: textSecondary,
                     cursor: 'pointer',
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: 500,
                     transition: 'all 0.15s ease',
                   }}
@@ -162,14 +164,16 @@ export function ConfirmDialog() {
                 <button
                   onClick={handleConfirm}
                   autoFocus
+                  className="touch-target"
                   style={{
-                    padding: '10px 20px',
-                    borderRadius: 8,
+                    padding: '12px 24px',
+                    minHeight: 48,
+                    borderRadius: 10,
                     border: 'none',
                     backgroundColor: options.variant === 'danger' ? '#ef4444' : '#3b82f6',
                     color: 'white',
                     cursor: 'pointer',
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: 500,
                     transition: 'all 0.15s ease',
                   }}
