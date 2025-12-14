@@ -15,7 +15,9 @@ import {
   Type,
   Frame,
   Hand,
-  MessageSquare
+  MessageSquare,
+  Pencil,
+  PenTool
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState, useRef, useEffect } from 'react';
@@ -41,6 +43,13 @@ export function Toolbar() {
             switch (e.key.toLowerCase()) {
                 case 'v': setActiveTool('select'); break;
                 case 'h': setActiveTool('hand'); break;
+                case 'p': 
+                    if (e.shiftKey) {
+                        setActiveTool('pen');
+                    } else {
+                        setActiveTool('pencil');
+                    }
+                    break;
                 case 'f': setActiveTool('frame'); break;
                 case 'r': setActiveTool('rectangle'); break;
                 case 't': setActiveTool('text'); break;
@@ -55,6 +64,8 @@ export function Toolbar() {
     const tools: { id: Tool; icon: React.ElementType; label: string; shortcut: string; nodeType?: string }[] = [
         { id: 'select', icon: MousePointer2, label: 'Move', shortcut: 'V' },
         { id: 'hand', icon: Hand, label: 'Hand', shortcut: 'H' },
+        { id: 'pencil', icon: Pencil, label: 'Pencil', shortcut: 'P' },
+        { id: 'pen', icon: PenTool, label: 'Pen', shortcut: '⇧P' },
         { id: 'frame', icon: Frame, label: 'Frame', shortcut: 'F', nodeType: 'frameNode' },
         { id: 'rectangle', icon: Square, label: 'Rectangle', shortcut: 'R', nodeType: 'rectangleNode' },
         { id: 'text', icon: Type, label: 'Text', shortcut: 'T', nodeType: 'textNode' },
@@ -136,8 +147,8 @@ export function Toolbar() {
                 >
                     {tools.map((tool, index) => (
                         <React.Fragment key={tool.id}>
-                            {/* Separator after hand tool */}
-                            {index === 2 && (
+                            {/* Separator after pen tool */}
+                            {index === 4 && (
                                 <div style={{ 
                                     width: 1, 
                                     height: 24, 
@@ -146,7 +157,7 @@ export function Toolbar() {
                                 }} />
                             )}
                             {/* Separator before comment */}
-                            {index === 7 && (
+                            {index === 9 && (
                                 <div style={{ 
                                     width: 1, 
                                     height: 24, 

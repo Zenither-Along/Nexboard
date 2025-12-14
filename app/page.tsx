@@ -1,7 +1,6 @@
 "use client"
 
 import InfiniteCanvas from "../components/canvas/InfiniteCanvas";
-import PropertiesPanel from "@/components/canvas/PropertiesPanel";
 import { HomePage } from "@/components/home/HomePage";
 import { Toolbar } from "@/components/ui/Toolbar";
 import { useAppStore } from "@/store/useAppStore";
@@ -13,7 +12,6 @@ export default function Home() {
     <main className="relative w-screen h-screen overflow-hidden bg-background">
       {activeView === 'home' ? <HomePage /> : <InfiniteCanvas />}
       <Toolbar />
-      {activeView !== 'home' && <PropertiesPanel />}
     </main>
   );
 }

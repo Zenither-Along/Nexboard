@@ -14,13 +14,13 @@ export default function TextNode({ id, data, selected }: NodeProps) {
   const setNodes = useStore((state) => state.setNodes);
 
   // Get text properties from node data with defaults
-  const text = data?.text || 'Type something';
-  const fontSize = data?.fontSize || 16;
-  const fontFamily = data?.fontFamily || 'Inter';
-  const fontWeight = data?.fontWeight || 400;
-  const textAlign = data?.textAlign || 'left';
-  const fill = data?.fill || (isDark ? '#ffffff' : '#000000');
-  const lineHeight = data?.lineHeight || 1.4;
+  const text = (data?.text as string) || 'Type something';
+  const fontSize = (data?.fontSize as number) || 16;
+  const fontFamily = (data?.fontFamily as string) || 'Inter';
+  const fontWeight = (data?.fontWeight as number | string) || 400;
+  const textAlign = (data?.textAlign as string) || 'left';
+  const fill = (data?.fill as string) || (isDark ? '#ffffff' : '#000000');
+  const lineHeight = (data?.lineHeight as number | string) || 1.4;
 
   const updateNodeData = (key: string, value: any) => {
     setNodes(nodes.map(n => 

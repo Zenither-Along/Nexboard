@@ -13,7 +13,7 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react';
 
-export type Tool = 'select' | 'hand' | 'frame' | 'rectangle' | 'text' | 'polaroid' | 'sticky' | 'comment';
+export type Tool = 'select' | 'hand' | 'pencil' | 'pen' | 'frame' | 'rectangle' | 'text' | 'polaroid' | 'sticky' | 'comment';
 
 type State = {
   nodes: Node[];
@@ -26,6 +26,11 @@ type State = {
   setEdges: (edges: Edge[]) => void;
   setActiveTool: (tool: Tool) => void;
   addNode: (node: Node) => void;
+  updateNodeData: (nodeId: string, data: Record<string, unknown>) => void;
+  updateNode: (nodeId: string, position: { x: number; y: number }, data: Record<string, unknown>) => void;
+  updateNodeFull: (nodeId: string, position: { x: number; y: number }, style: Record<string, unknown>, data: Record<string, unknown>) => void;
+  attachNodeToFrame: (nodeId: string, frameId: string) => void;
+  detachNodeFromFrame: (nodeId: string) => void;
 };
 
 const useStore = create<State>((set, get) => ({
@@ -58,6 +63,88 @@ const useStore = create<State>((set, get) => ({
   },
   addNode: (node: Node) => {
     set({ nodes: [...get().nodes, node] });
+  },
+  updateNodeData: (nodeId: string, newData: Record<string, unknown>) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, ...newData } }
+          : node
+      ),
+    });
+  },
+  updateNode: (nodeId: string, position: { x: number; y: number }, newData: Record<string, unknown>) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === nodeId
+          ? { ...node, position, data: { ...node.data, ...newData } }
+          : node
+      ),
+    });
+  },
+  updateNodeFull: (nodeId: string, position: { x: number; y: number }, newStyle: Record<string, unknown>, newData: Record<string, unknown>) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === nodeId
+          ? { 
+              ...node, 
+              position, 
+              style: { ...node.style, ...newStyle },
+              data: { ...node.data, ...newData } 
+            }
+          : node
+      ),
+    });
+  },
+  attachNodeToFrame: (nodeId: string, frameId: string) => {
+    const nodes = get().nodes;
+    const node = nodes.find(n => n.id === nodeId);
+    const frame = nodes.find(n => n.id === frameId);
+    
+    if (!node || !frame || node.id === frameId) return;
+    
+    // Convert absolute position to relative position within frame
+    const relativeX = node.position.x - frame.position.x;
+    const relativeY = node.position.y - frame.position.y;
+    
+    set({
+      nodes: nodes.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              parentId: frameId,
+              extent: 'parent' as const,
+              position: { x: relativeX, y: relativeY },
+            }
+          : n
+      ),
+    });
+  },
+  detachNodeFromFrame: (nodeId: string) => {
+    const nodes = get().nodes;
+    const node = nodes.find(n => n.id === nodeId);
+    
+    if (!node || !node.parentId) return;
+    
+    const parent = nodes.find(n => n.id === node.parentId);
+    if (!parent) return;
+    
+    // Convert relative position back to absolute
+    const absoluteX = parent.position.x + node.position.x;
+    const absoluteY = parent.position.y + node.position.y;
+    
+    set({
+      nodes: nodes.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              parentId: undefined,
+              extent: undefined,
+              position: { x: absoluteX, y: absoluteY },
+            }
+          : n
+      ),
+    });
   },
 }));
 
