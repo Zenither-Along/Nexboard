@@ -13,7 +13,7 @@ import { useTheme } from 'next-themes';
 import PolaroidNode from '@/components/widgets/PolaroidNode';
 import StickyNote from '@/components/widgets/StickyNote';
 import FrameNode from '@/components/widgets/FrameNode';
-import RectangleNode from '@/components/widgets/RectangleNode';
+import ShapeNode from '@/components/widgets/ShapeNode';
 import TextNode from '@/components/widgets/TextNode';
 import DrawingNode from '@/components/widgets/DrawingNode';
 import StringEdge from '@/components/canvas/StringEdge';
@@ -23,7 +23,8 @@ const nodeTypes = {
   polaroidNode: PolaroidNode, 
   stickyNote: StickyNote,
   frameNode: FrameNode,
-  rectangleNode: RectangleNode,
+  rectangleNode: ShapeNode, // Map legacy rectangleNode to ShapeNode
+  shapeNode: ShapeNode,     // New unified shape node
   textNode: TextNode,
   drawingNode: DrawingNode,
 };
@@ -160,7 +161,6 @@ function Flow() {
           y: pos.y - parentFrame.position.y,
         },
         parentId: parentFrame.id,
-        extent: 'parent' as const,
         data: { label: type },
       });
     } else {
@@ -170,11 +170,16 @@ function Flow() {
 
   // Click on canvas to create element based on active tool
   const onPaneClick = useCallback((e: React.MouseEvent) => {
-    // Frame uses drag-to-draw, not click
-    if (['select', 'hand', 'comment', 'pencil', 'pen', 'frame'].includes(activeTool)) return;
+    // Frame, shapes, text, polaroid, and sticky use drag-to-draw, not click
+    if (['select', 'hand', 'comment', 'pencil', 'pen', 'frame', 'rectangle', 'ellipse', 'polygon', 'star', 'line', 'arrow', 'text', 'polaroid', 'sticky'].includes(activeTool)) return;
     
     const toolToNodeType: Record<string, string> = {
-      rectangle: 'rectangleNode',
+      rectangle: 'shapeNode',
+      ellipse: 'shapeNode',
+      polygon: 'shapeNode',
+      star: 'shapeNode',
+      line: 'shapeNode',
+      arrow: 'shapeNode',
       text: 'textNode',
       polaroid: 'polaroidNode',
       sticky: 'stickyNote',
@@ -206,6 +211,12 @@ function Flow() {
       }
     }
     
+    const nodeData = { 
+      label: nodeType,
+      // For shape nodes, pass the specific shape type (e.g. 'ellipse')
+      type: nodeType === 'shapeNode' ? (activeTool === 'rectangle' ? 'rectangle' : activeTool) : undefined
+    };
+
     // Create node with parent if inside a frame
     if (parentFrame) {
       addNode({
@@ -216,15 +227,14 @@ function Flow() {
           y: pos.y - parentFrame.position.y,
         },
         parentId: parentFrame.id,
-        extent: 'parent' as const,
-        data: { label: nodeType },
+        data: nodeData,
       });
     } else {
       addNode({
         id: nodeId,
         type: nodeType,
         position: pos,
-        data: { label: nodeType },
+        data: nodeData,
       });
     }
     
@@ -273,11 +283,30 @@ function Flow() {
     };
     drawingPointsRef.current.push(relativePoint);
     
-    // Update the drawing node with new relative points
-    updateNodeData(currentDrawingId, {
-      points: [...drawingPointsRef.current],
+    // Calculate current bounds to handle negative coordinates
+    const xs = drawingPointsRef.current.map(p => p.x);
+    const ys = drawingPointsRef.current.map(p => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    
+    // Update node position to account for negative coordinates
+    // This keeps the visual drawing under the cursor
+    const currentPosition = {
+      x: origin.x + minX,
+      y: origin.y + minY,
+    };
+    
+    // Shift points relative to current top-left
+    const shiftedPoints = drawingPointsRef.current.map(p => ({
+      x: p.x - minX,
+      y: p.y - minY,
+    }));
+    
+    // Update the drawing node with new position and shifted points
+    updateNode(currentDrawingId, currentPosition, {
+      points: shiftedPoints,
     });
-  }, [isDrawing, currentDrawingId, screenToFlowPosition, updateNodeData]);
+  }, [isDrawing, currentDrawingId, screenToFlowPosition, updateNode]);
 
   const handleMouseUp = useCallback(() => {
     if (isDrawing && currentDrawingId) {
@@ -418,34 +447,436 @@ function Flow() {
     }
   }, [isDrawingFrame, currentFrameId, frameStartPos, setActiveTool]);
 
+  // Shape drawing state
+  const [isDrawingShape, setIsDrawingShape] = useState(false);
+  const [shapeStartPos, setShapeStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [currentShapeId, setCurrentShapeId] = useState<string | null>(null);
+
+  // Text drawing state
+  const [isDrawingText, setIsDrawingText] = useState(false);
+  const [textStartPos, setTextStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [currentTextId, setCurrentTextId] = useState<string | null>(null);
+
+  // Polaroid drawing state
+  const [isDrawingPolaroid, setIsDrawingPolaroid] = useState(false);
+  const [polaroidStartPos, setPolaroidStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [currentPolaroidId, setCurrentPolaroidId] = useState<string | null>(null);
+
+  // Sticky note drawing state
+  const [isDrawingSticky, setIsDrawingSticky] = useState(false);
+  const [stickyStartPos, setStickyStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [currentStickyId, setCurrentStickyId] = useState<string | null>(null);
+
+  // Shape drawing handlers - drag to draw shape size
+  const handleShapeMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!['rectangle', 'ellipse', 'polygon', 'star', 'line', 'arrow'].includes(activeTool)) return;
+    
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    const nodeId = generateId();
+    
+    setIsDrawingShape(true);
+    setShapeStartPos(pos);
+    setCurrentShapeId(nodeId);
+    
+    const nodeData = { 
+      label: activeTool,
+      type: activeTool === 'rectangle' ? 'rectangle' : activeTool,
+      // Default styles for newly created shapes
+      stroke: isDark ? '#e5e5e5' : '#000000',
+      fill: isDark ? '#2d2d2d' : '#ffffff',
+      strokeWidth: 2,
+    };
+
+    // Create shape with minimum size initially
+    addNode({
+      id: nodeId,
+      type: 'shapeNode',
+      position: pos,
+      style: { width: 1, height: 1 }, // Start small
+      data: nodeData,
+    });
+  }, [activeTool, screenToFlowPosition, addNode, isDark]);
+
+  const handleShapeMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDrawingShape || !shapeStartPos || !currentShapeId) return;
+    
+    const currentPos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    
+    // Calculate width and height
+    const width = Math.abs(currentPos.x - shapeStartPos.x);
+    const height = Math.abs(currentPos.y - shapeStartPos.y);
+    
+    // Get top-left corner
+    const x = Math.min(currentPos.x, shapeStartPos.x);
+    const y = Math.min(currentPos.y, shapeStartPos.y);
+    
+    // Update shape position and size
+    const finalWidth = Math.max(width, 10); // Minimum 10px to avoid accidental tiny shapes
+    const finalHeight = Math.max(height, 10);
+    
+    // For Infinite Canvas shapes, we usually update dimensions via style or data (ShapeNode uses width/height props or style)
+    // ShapeNode implementation uses `width` and `height` props if available, falling back to data? 
+    // Let's update style width/height which is standard for sizing.
+    updateNodeFull(
+      currentShapeId, 
+      { x, y }, 
+      { width: finalWidth, height: finalHeight },
+      { width: finalWidth, height: finalHeight }
+    );
+  }, [isDrawingShape, shapeStartPos, currentShapeId, screenToFlowPosition, updateNodeFull]);
+
+  const handleShapeMouseUp = useCallback(() => {
+    if (isDrawingShape && currentShapeId && shapeStartPos) {
+      
+      // Check if shape is inside any frame (auto-parenting)
+      // Get the final node to check its position/size
+      const node = useStore.getState().nodes.find(n => n.id === currentShapeId);
+      if (node) {
+        const shapeWidth = (node.style?.width as number) || 50;
+        const shapeHeight = (node.style?.height as number) || 50;
+        const shapeX = node.position.x;
+        const shapeY = node.position.y;
+        
+        // Find frames
+        const frames = useStore.getState().nodes.filter(n => n.type === 'frameNode');
+        let parentFrame: Node | null = null;
+        
+        for (const frame of frames) {
+          const frameWidth = (frame.style?.width as number) || (frame.data?.width as number) || 200;
+          const frameHeight = (frame.style?.height as number) || (frame.data?.height as number) || 150;
+          
+          // Check if shape is inside frame
+          // Using a simple center-point check or full containment check?
+          // Let's use full containment for auto-parenting on creation
+          const isInside = 
+            shapeX >= frame.position.x &&
+            shapeX + shapeWidth <= frame.position.x + frameWidth &&
+            shapeY >= frame.position.y &&
+            shapeY + shapeHeight <= frame.position.y + frameHeight;
+            
+          if (isInside) {
+            parentFrame = frame;
+            break;
+          }
+        }
+        
+        if (parentFrame) {
+             const attachNodeToFrame = useStore.getState().attachNodeToFrame;
+             attachNodeToFrame(currentShapeId, parentFrame.id);
+        }
+      }
+
+      setIsDrawingShape(false);
+      setShapeStartPos(null);
+      setCurrentShapeId(null);
+      
+      // Switch back to select tool
+      setActiveTool('select');
+    }
+  }, [isDrawingShape, currentShapeId, shapeStartPos, setActiveTool]);
+
+  // Text drawing handlers - drag to draw text box size
+  const handleTextMouseDown = useCallback((e: React.MouseEvent) => {
+    if (activeTool !== 'text') return;
+    
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    const nodeId = generateId();
+    
+    setIsDrawingText(true);
+    setTextStartPos(pos);
+    setCurrentTextId(nodeId);
+    
+    // Create initial text node with minimum size
+    addNode({
+      id: nodeId,
+      type: 'textNode',
+      position: pos,
+      style: { width: 10, height: 10 },
+      data: { text: 'Type something', label: 'textNode' },
+    });
+  }, [activeTool, screenToFlowPosition, addNode]);
+
+  const handleTextMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDrawingText || !textStartPos || !currentTextId) return;
+    
+    const currentPos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    
+    // Calculate width and height
+    const width = Math.abs(currentPos.x - textStartPos.x);
+    const height = Math.abs(currentPos.y - textStartPos.y);
+    
+    // Minimum dimensions
+    const finalWidth = Math.max(50, width);
+    const finalHeight = Math.max(24, height);
+    
+    // Calculate position (top-left corner)
+    const x = Math.min(textStartPos.x, currentPos.x);
+    const y = Math.min(textStartPos.y, currentPos.y);
+    
+    // Update node position and size
+    updateNodeFull(
+      currentTextId,
+      { x, y },
+      { width: finalWidth, height: finalHeight },
+      { width: finalWidth, height: finalHeight }
+    );
+  }, [isDrawingText, textStartPos, currentTextId, screenToFlowPosition, updateNodeFull]);
+
+  const handleTextMouseUp = useCallback(() => {
+    if (isDrawingText && currentTextId && textStartPos) {
+      // Check for auto-parenting to frames
+      const currentNode = useStore.getState().nodes.find(n => n.id === currentTextId);
+      
+      if (currentNode) {
+        const textX = currentNode.position.x;
+        const textY = currentNode.position.y;
+        const textWidth = (currentNode.style?.width as number) || 50;
+        const textHeight = (currentNode.style?.height as number) || 24;
+        
+        // Find frames
+        const frames = useStore.getState().nodes.filter(n => n.type === 'frameNode');
+        let parentFrame: Node | null = null;
+        
+        for (const frame of frames) {
+          const frameWidth = (frame.style?.width as number) || (frame.data?.width as number) || 200;
+          const frameHeight = (frame.style?.height as number) || (frame.data?.height as number) || 150;
+          
+          // Check if text is inside frame
+          const isInside = 
+            textX >= frame.position.x &&
+            textX + textWidth <= frame.position.x + frameWidth &&
+            textY >= frame.position.y &&
+            textY + textHeight <= frame.position.y + frameHeight;
+            
+          if (isInside) {
+            parentFrame = frame;
+            break;
+          }
+        }
+        
+        if (parentFrame) {
+          const attachNodeToFrame = useStore.getState().attachNodeToFrame;
+          attachNodeToFrame(currentTextId, parentFrame.id);
+        }
+      }
+
+      setIsDrawingText(false);
+      setTextStartPos(null);
+      setCurrentTextId(null);
+      
+      // Switch back to select tool
+      setActiveTool('select');
+    }
+  }, [isDrawingText, currentTextId, textStartPos, setActiveTool]);
+
+  // Polaroid drawing handlers - drag to draw polaroid size
+  const handlePolaroidMouseDown = useCallback((e: React.MouseEvent) => {
+    if (activeTool !== 'polaroid') return;
+    
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    const nodeId = generateId();
+    
+    setIsDrawingPolaroid(true);
+    setPolaroidStartPos(pos);
+    setCurrentPolaroidId(nodeId);
+    
+    // Create initial polaroid node with minimum size
+    addNode({
+      id: nodeId,
+      type: 'polaroidNode',
+      position: pos,
+      style: { width: 10, height: 10 },
+      data: { label: 'polaroidNode' },
+    });
+  }, [activeTool, screenToFlowPosition, addNode]);
+
+  const handlePolaroidMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDrawingPolaroid || !polaroidStartPos || !currentPolaroidId) return;
+    
+    const currentPos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    
+    const width = Math.abs(currentPos.x - polaroidStartPos.x);
+    const height = Math.abs(currentPos.y - polaroidStartPos.y);
+    
+    // Minimum dimensions for polaroid (needs space for image + caption)
+    const finalWidth = Math.max(200, width);
+    const finalHeight = Math.max(250, height);
+    
+    const x = Math.min(polaroidStartPos.x, currentPos.x);
+    const y = Math.min(polaroidStartPos.y, currentPos.y);
+    
+    updateNodeFull(
+      currentPolaroidId,
+      { x, y },
+      { width: finalWidth, height: finalHeight },
+      { width: finalWidth, height: finalHeight }
+    );
+  }, [isDrawingPolaroid, polaroidStartPos, currentPolaroidId, screenToFlowPosition, updateNodeFull]);
+
+  const handlePolaroidMouseUp = useCallback(() => {
+    if (isDrawingPolaroid && currentPolaroidId && polaroidStartPos) {
+      // Check for auto-parenting to frames
+      const currentNode = useStore.getState().nodes.find(n => n.id === currentPolaroidId);
+      
+      if (currentNode) {
+        const nodeX = currentNode.position.x;
+        const nodeY = currentNode.position.y;
+        const nodeWidth = (currentNode.style?.width as number) || 200;
+        const nodeHeight = (currentNode.style?.height as number) || 250;
+        
+        const frames = useStore.getState().nodes.filter(n => n.type === 'frameNode');
+        let parentFrame: Node | null = null;
+        
+        for (const frame of frames) {
+          const frameWidth = (frame.style?.width as number) || (frame.data?.width as number) || 200;
+          const frameHeight = (frame.style?.height as number) || (frame.data?.height as number) || 150;
+          
+          const isInside = 
+            nodeX >= frame.position.x &&
+            nodeX + nodeWidth <= frame.position.x + frameWidth &&
+            nodeY >= frame.position.y &&
+            nodeY + nodeHeight <= frame.position.y + frameHeight;
+            
+          if (isInside) {
+            parentFrame = frame;
+            break;
+          }
+        }
+        
+        if (parentFrame) {
+          const attachNodeToFrame = useStore.getState().attachNodeToFrame;
+          attachNodeToFrame(currentPolaroidId, parentFrame.id);
+        }
+      }
+
+      setIsDrawingPolaroid(false);
+      setPolaroidStartPos(null);
+      setCurrentPolaroidId(null);
+      setActiveTool('select');
+    }
+  }, [isDrawingPolaroid, currentPolaroidId, polaroidStartPos, setActiveTool]);
+
+  // Sticky note drawing handlers - drag to draw sticky size
+  const handleStickyMouseDown = useCallback((e: React.MouseEvent) => {
+    if (activeTool !== 'sticky') return;
+    
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    const nodeId = generateId();
+    
+    setIsDrawingSticky(true);
+    setStickyStartPos(pos);
+    setCurrentStickyId(nodeId);
+    
+    // Create initial sticky note with minimum size
+    addNode({
+      id: nodeId,
+      type: 'stickyNote',
+      position: pos,
+      style: { width: 10, height: 10 },
+      data: { label: 'stickyNote' },
+    });
+  }, [activeTool, screenToFlowPosition, addNode]);
+
+  const handleStickyMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDrawingSticky || !stickyStartPos || !currentStickyId) return;
+    
+    const currentPos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    
+    const width = Math.abs(currentPos.x - stickyStartPos.x);
+    const height = Math.abs(currentPos.y - stickyStartPos.y);
+    
+    // Minimum dimensions for sticky note
+    const finalWidth = Math.max(120, width);
+    const finalHeight = Math.max(100, height);
+    
+    const x = Math.min(stickyStartPos.x, currentPos.x);
+    const y = Math.min(stickyStartPos.y, currentPos.y);
+    
+    updateNodeFull(
+      currentStickyId,
+      { x, y },
+      { width: finalWidth, height: finalHeight },
+      { width: finalWidth, height: finalHeight }
+    );
+  }, [isDrawingSticky, stickyStartPos, currentStickyId, screenToFlowPosition, updateNodeFull]);
+
+  const handleStickyMouseUp = useCallback(() => {
+    if (isDrawingSticky && currentStickyId && stickyStartPos) {
+      // Check for auto-parenting to frames
+      const currentNode = useStore.getState().nodes.find(n => n.id === currentStickyId);
+      
+      if (currentNode) {
+        const nodeX = currentNode.position.x;
+        const nodeY = currentNode.position.y;
+        const nodeWidth = (currentNode.style?.width as number) || 120;
+        const nodeHeight = (currentNode.style?.height as number) || 100;
+        
+        const frames = useStore.getState().nodes.filter(n => n.type === 'frameNode');
+        let parentFrame: Node | null = null;
+        
+        for (const frame of frames) {
+          const frameWidth = (frame.style?.width as number) || (frame.data?.width as number) || 200;
+          const frameHeight = (frame.style?.height as number) || (frame.data?.height as number) || 150;
+          
+          const isInside = 
+            nodeX >= frame.position.x &&
+            nodeX + nodeWidth <= frame.position.x + frameWidth &&
+            nodeY >= frame.position.y &&
+            nodeY + nodeHeight <= frame.position.y + frameHeight;
+            
+          if (isInside) {
+            parentFrame = frame;
+            break;
+          }
+        }
+        
+        if (parentFrame) {
+          const attachNodeToFrame = useStore.getState().attachNodeToFrame;
+          attachNodeToFrame(currentStickyId, parentFrame.id);
+        }
+      }
+
+      setIsDrawingSticky(false);
+      setStickyStartPos(null);
+      setCurrentStickyId(null);
+      setActiveTool('select');
+    }
+  }, [isDrawingSticky, currentStickyId, stickyStartPos, setActiveTool]);
+
   // Auto-attach nodes to frames when dropped inside
   const handleNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
     // Don't auto-attach frames to other frames
     if (node.type === 'frameNode') return;
     
+    // Get FRESH nodes from store - important to avoid stale closure
+    const currentNodes = useStore.getState().nodes;
+        
+    // The node parameter has the CURRENT position after drag
     // Calculate absolute position of the node
-    // If node has a parent, its position is relative to parent
     let absoluteX = node.position.x;
     let absoluteY = node.position.y;
     
     if (node.parentId) {
-      const parent = nodes.find(n => n.id === node.parentId);
+      const parent = currentNodes.find(n => n.id === node.parentId);
       if (parent) {
         absoluteX = parent.position.x + node.position.x;
         absoluteY = parent.position.y + node.position.y;
       }
     }
     
-    // Find all frame nodes
-    const frames = nodes.filter(n => n.type === 'frameNode');
+    console.log('Absolute position:', absoluteX, absoluteY);
+    
+    // Find all frame nodes from FRESH nodes
+    const frames = currentNodes.filter(n => n.type === 'frameNode');
+    console.log('Frames found:', frames.length);
     
     // Check if node is inside any frame
-    let foundFrame = false;
+    let foundFrame: Node | null = null;
     for (const frame of frames) {
       const frameWidth = (frame.style?.width as number) || (frame.data?.width as number) || 200;
       const frameHeight = (frame.style?.height as number) || (frame.data?.height as number) || 150;
       
-      // Check if node center is inside frame bounds (using absolute position)
+      // Check if node position is inside frame bounds (using absolute position)
       const isInside = 
         absoluteX >= frame.position.x &&
         absoluteX <= frame.position.x + frameWidth &&
@@ -453,21 +884,47 @@ function Flow() {
         absoluteY <= frame.position.y + frameHeight;
       
       if (isInside) {
-        // Only attach if not already attached to this frame
-        if (node.parentId !== frame.id) {
-          attachNodeToFrame(node.id, frame.id);
-        }
-        foundFrame = true;
+        foundFrame = frame;
         break;
       }
     }
     
-    // If not inside any frame but has a parent, detach it
-    if (!foundFrame && node.parentId) {
+    if (foundFrame) {
+      // Only attach if not already attached to this frame
+      if (node.parentId !== foundFrame.id) {
+        // Calculate relative position for attachment
+        const relativeX = absoluteX - foundFrame.position.x;
+        const relativeY = absoluteY - foundFrame.position.y;
+        
+        // Update node with parent and relative position
+        // IMPORTANT: Reorder nodes so parent (frame) comes BEFORE child
+        const setNodes = useStore.getState().setNodes;
+        
+        const updatedNode = { 
+          ...currentNodes.find(n => n.id === node.id)!, 
+          parentId: foundFrame!.id, 
+          position: { x: relativeX, y: relativeY } 
+        };
+        
+        // Filter out the node being attached, then add it after its parent frame
+        const otherNodes = currentNodes.filter(n => n.id !== node.id);
+        const frameIndex = otherNodes.findIndex(n => n.id === foundFrame!.id);
+        
+        // Insert the child node right after the parent frame
+        const reorderedNodes = [
+          ...otherNodes.slice(0, frameIndex + 1),
+          updatedNode,
+          ...otherNodes.slice(frameIndex + 1)
+        ];
+        
+        setNodes(reorderedNodes);
+      }
+    } else if (node.parentId) {
+      // If not inside any frame but has a parent, detach it
       const detachFromFrame = useStore.getState().detachNodeFromFrame;
       detachFromFrame(node.id);
     }
-  }, [nodes, attachNodeToFrame]);
+  }, []); // No dependencies - we get fresh state inside
 
   // Get cursor based on active tool
   const getCursor = () => {
@@ -517,6 +974,10 @@ function Flow() {
         snapToGrid={false}
         connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
         elevateNodesOnSelect={false}
+        // Performance optimizations
+        onlyRenderVisibleElements={true}
+        autoPanOnNodeDrag={false}
+        deleteKeyCode="Delete" // Enable delete key for nodes
         // Panning when space pressed OR hand tool active
         panOnDrag={isSpacePressed || activeTool === 'hand'}
         // Selection only when in select mode
@@ -584,6 +1045,114 @@ function Flow() {
         />
       )}
 
+      {/* Shape Drawing Overlay - active when any shape tool is selected */}
+      {['rectangle', 'ellipse', 'polygon', 'star', 'line', 'arrow'].includes(activeTool) && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 5,
+            cursor: 'crosshair',
+          }}
+          onMouseDown={handleShapeMouseDown}
+          onMouseMove={handleShapeMouseMove}
+          onMouseUp={handleShapeMouseUp}
+          onMouseLeave={handleShapeMouseUp}
+          onWheel={(e) => {
+            e.currentTarget.style.pointerEvents = 'none';
+            setTimeout(() => {
+              if (e.currentTarget) {
+                e.currentTarget.style.pointerEvents = 'auto';
+              }
+            }, 0);
+          }}
+        />
+      )}
+
+      {/* Text Drawing Overlay - active when text tool is selected */}
+      {activeTool === 'text' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 5,
+            cursor: 'crosshair',
+          }}
+          onMouseDown={handleTextMouseDown}
+          onMouseMove={handleTextMouseMove}
+          onMouseUp={handleTextMouseUp}
+          onMouseLeave={handleTextMouseUp}
+          onWheel={(e) => {
+            e.currentTarget.style.pointerEvents = 'none';
+            setTimeout(() => {
+              if (e.currentTarget) {
+                e.currentTarget.style.pointerEvents = 'auto';
+              }
+            }, 0);
+          }}
+        />
+      )}
+
+      {/* Polaroid Drawing Overlay - active when polaroid tool is selected */}
+      {activeTool === 'polaroid' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 5,
+            cursor: 'crosshair',
+          }}
+          onMouseDown={handlePolaroidMouseDown}
+          onMouseMove={handlePolaroidMouseMove}
+          onMouseUp={handlePolaroidMouseUp}
+          onMouseLeave={handlePolaroidMouseUp}
+          onWheel={(e) => {
+            e.currentTarget.style.pointerEvents = 'none';
+            setTimeout(() => {
+              if (e.currentTarget) {
+                e.currentTarget.style.pointerEvents = 'auto';
+              }
+            }, 0);
+          }}
+        />
+      )}
+
+      {/* Sticky Note Drawing Overlay - active when sticky tool is selected */}
+      {activeTool === 'sticky' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 5,
+            cursor: 'crosshair',
+          }}
+          onMouseDown={handleStickyMouseDown}
+          onMouseMove={handleStickyMouseMove}
+          onMouseUp={handleStickyMouseUp}
+          onMouseLeave={handleStickyMouseUp}
+          onWheel={(e) => {
+            e.currentTarget.style.pointerEvents = 'none';
+            setTimeout(() => {
+              if (e.currentTarget) {
+                e.currentTarget.style.pointerEvents = 'auto';
+              }
+            }, 0);
+          }}
+        />
+      )}
+
       {/* Pen Tool - for vector paths with Bézier curves */}
       <PenTool
         onPathComplete={(path: PenPath) => {
@@ -638,7 +1207,6 @@ function Flow() {
                   y: newPosition.y - parentFrame.position.y,
                 },
                 parentId: parentFrame.id,
-                extent: 'parent' as const,
                 data: {
                   penNodes: normalizedNodes,
                   closed: path.closed,

@@ -13,7 +13,7 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react';
 
-export type Tool = 'select' | 'hand' | 'pencil' | 'pen' | 'frame' | 'rectangle' | 'text' | 'polaroid' | 'sticky' | 'comment';
+export type Tool = 'select' | 'hand' | 'pencil' | 'pen' | 'frame' | 'rectangle' | 'line' | 'arrow' | 'ellipse' | 'polygon' | 'star' | 'text' | 'polaroid' | 'sticky' | 'comment';
 
 type State = {
   nodes: Node[];
@@ -113,7 +113,6 @@ const useStore = create<State>((set, get) => ({
           ? {
               ...n,
               parentId: frameId,
-              extent: 'parent' as const,
               position: { x: relativeX, y: relativeY },
             }
           : n

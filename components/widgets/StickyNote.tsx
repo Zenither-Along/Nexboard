@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react';
 
-export default function StickyNote({ data, selected }: NodeProps) {
+const StickyNote = memo(({ data, selected }: NodeProps) => {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
@@ -110,4 +110,7 @@ export default function StickyNote({ data, selected }: NodeProps) {
       />
     </div>
   );
-}
+});
+
+StickyNote.displayName = 'StickyNote';
+export default StickyNote;

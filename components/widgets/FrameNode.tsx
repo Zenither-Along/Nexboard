@@ -1,9 +1,9 @@
 
-import React from 'react';
+import React, { memo } from 'react';
 import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react';
 import { useTheme } from 'next-themes';
 
-export default function FrameNode({ selected }: NodeProps) {
+const FrameNode = memo(({ selected }: NodeProps) => {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
@@ -47,4 +47,7 @@ export default function FrameNode({ selected }: NodeProps) {
       </div>
     </>
   );
-}
+});
+
+FrameNode.displayName = 'FrameNode';
+export default FrameNode;

@@ -1,6 +1,6 @@
 "use client"
 
-import React from 'react';
+import React, { memo } from 'react';
 import { NodeProps, Handle, Position } from '@xyflow/react';
 import { useTheme } from 'next-themes';
 
@@ -172,7 +172,7 @@ function getBounds(points: { x: number; y: number }[], handles?: { handleIn?: { 
   };
 }
 
-export default function DrawingNode({ data, selected }: NodeProps) {
+const DrawingNode = memo(({ data, selected }: NodeProps) => {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   
@@ -255,4 +255,8 @@ export default function DrawingNode({ data, selected }: NodeProps) {
       />
     </div>
   );
-}
+});
+
+DrawingNode.displayName = 'DrawingNode';
+export default DrawingNode;
+

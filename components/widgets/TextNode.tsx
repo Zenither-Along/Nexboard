@@ -55,10 +55,10 @@ export default function TextNode({ id, data, selected }: NodeProps) {
       style={{
         width: '100%',
         height: '100%',
-        minWidth: 50,
-        minHeight: 24,
         boxSizing: 'border-box',
         position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
       }}
       onDoubleClick={handleDoubleClick}
     >
@@ -98,6 +98,8 @@ export default function TextNode({ id, data, selected }: NodeProps) {
           cursor: isEditing ? 'text' : 'default',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
         }}
       >
         {text}

@@ -1,16 +1,57 @@
 "use client"
 
-import React, { useState, useRef } from 'react';
+import React, { useRef, memo, useCallback, useEffect } from 'react';
 import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react';
 import { useTheme } from 'next-themes';
+import useStore from '@/store/useStore';
 
-export default function PolaroidNode({ data, selected }: NodeProps) {
-  const [imageUrl, setImageUrl] = useState('');
-  const [caption, setCaption] = useState('');
-  const [isDragging, setIsDragging] = useState(false);
+const PolaroidNode = memo(({ id, data, selected }: NodeProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const updateNodeData = useStore((state) => state.updateNodeData);
+  
+  // Get imageUrl and caption from node data instead of local state
+  const imageUrl = (data as any).imageUrl || '';
+  const caption = (data as any).caption || '';
+  const isDragging = (data as any).isDragging || false;
+
+  const setImageUrl = useCallback((url: string) => {
+    if (id) {
+      updateNodeData(id, { imageUrl: url });
+    }
+  }, [id, updateNodeData]);
+
+  const setCaption = useCallback((text: string) => {
+    if (id) {
+      updateNodeData(id, { caption: text });
+    }
+  }, [id, updateNodeData]);
+
+  const setIsDragging = useCallback((dragging: boolean) => {
+    if (id) {
+      updateNodeData(id, { isDragging: dragging });
+    }
+  }, [id, updateNodeData]);
+
+  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    const aspectRatio = img.naturalWidth / img.naturalHeight;
+    
+    // Set reasonable node size based on image dimensions
+    // Cap max width at 600px for performance
+    const maxWidth = 600;
+    const targetWidth = Math.min(img.naturalWidth, maxWidth);
+    const targetHeight = targetWidth / aspectRatio;
+    
+    // Update node size through store
+    if (id) {
+      updateNodeData(id, {
+        width: targetWidth,
+        height: targetHeight + 60, // Add space for padding and caption
+      });
+    }
+  }, [id, updateNodeData]);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -114,7 +155,19 @@ export default function PolaroidNode({ data, selected }: NodeProps) {
         tabIndex={0}
       >
         {imageUrl ? (
-          <img src={imageUrl} alt="Polaroid" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img 
+            src={imageUrl} 
+            alt="Polaroid"
+            onLoad={handleImageLoad}
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'contain', // Changed to contain to show full image
+              imageRendering: 'auto',
+              WebkitUserSelect: 'none',
+              userSelect: 'none',
+            }} 
+          />
         ) : (
           <div 
             style={{
@@ -187,4 +240,7 @@ export default function PolaroidNode({ data, selected }: NodeProps) {
       />
     </div>
   );
-}
+});
+
+PolaroidNode.displayName = 'PolaroidNode';
+export default PolaroidNode;
